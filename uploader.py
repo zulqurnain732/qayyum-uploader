@@ -17,7 +17,6 @@ S1 = "GOCSPX-"
 S2 = "fIbl82ugB74Mum7WvCMskf-oaowm"
 CLIENT_SECRET = S1 + S2
 
-# Refresh token split into safe fragments
 T1 = "1//041dYY6lxy6uTCgYIARAAGAQSNwF-L9Ir"
 T2 = "R--r5ucH3l4KbFMp0BvUitFUR__eryf5dUQT"
 T3 = "KshkFXyw6s3nTFnJR_ngQHkmHGysnH4"
@@ -50,6 +49,7 @@ print(f"Step 1: TikTok profile scan ho rahi hai: {TIKTOK_PROFILE_URL}...")
 
 cmd_dump = [
     "yt-dlp",
+    "--impersonate", "chrome",
     "--flat-playlist",
     "--playlist-end", "20",
     "-J",
@@ -57,22 +57,36 @@ cmd_dump = [
 ]
 
 res = subprocess.run(cmd_dump, capture_output=True, text=True)
-if res.returncode != 0:
-    print(f"Extraction notice: {res.stderr}")
-    exit(1)
 
-try:
-    data = json.loads(res.stdout)
-    entries = data.get("entries", [])
-except Exception as e:
-    print(f"JSON Parse error: {e}")
-    exit(1)
+entries = []
+if res.returncode == 0 and res.stdout:
+    try:
+        data = json.loads(res.stdout)
+        entries = data.get("entries", [])
+    except Exception as e:
+        print(f"yt-dlp parse notice: {e}")
+
+# Fallback: Agar dump fail ho to web scraper mirror use karna
+if not entries:
+    print("Primary dump fail hua, Web scraping fallback use ho raha hai...")
+    import requests
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    }
+    r = requests.get(TIKTOK_PROFILE_URL, headers=headers, timeout=25)
+    video_ids = re.findall(r'video\/(\d{15,22})', r.text)
+    unique_ids = list(dict.fromkeys(video_ids))
+    for vid in unique_ids[:20]:
+        entries.append({
+            "id": vid,
+            "url": f"https://www.tiktok.com/@the.qayyum8/video/{vid}",
+            "title": f"Shorts #{vid[-4:]}"
+        })
 
 if not entries:
-    print("Profile par koi video nahi mili.")
-    exit(0)
+    print("Profile par koi video nahi mil saki.")
+    exit(1)
 
-# Duplicate checking
 pending_videos = []
 for item in entries:
     v_id = str(item.get("id"))
@@ -84,7 +98,7 @@ if not pending_videos:
     exit(0)
 
 to_upload = pending_videos[:MAX_DAILY_UPLOADS]
-print(f"Total Nayi Videos: {len(pending_videos)}. Aaj upload hone ke liye chuni gayi: {len(to_upload)}")
+print(f"Nayi Videos Mili: {len(pending_videos)}. Aaj upload hone ke liye chuni gayi: {len(to_upload)}")
 
 now_utc = datetime.datetime.now(datetime.timezone.utc)
 
@@ -105,6 +119,7 @@ for idx, item in enumerate(to_upload):
     print(f"\n[{idx+1}/{len(to_upload)}] Video Download ho rahi hai: {clean_title}...")
     dl_cmd = [
         "yt-dlp",
+        "--impersonate", "chrome",
         "-f", "best[ext=mp4]/best",
         "-o", local_file,
         video_url
@@ -115,7 +130,7 @@ for idx, item in enumerate(to_upload):
     print(f"Downloaded ({file_size_mb:.2f} MB). Setup scheduling...")
 
     # idx == 0: Pehli video Foran Public
-    # idx > 0: Baqi 4 videos 2-2 ghante baad schedule
+    # idx > 0: Baqi 4 videos 2-2 ghante baad auto-schedule
     if idx == 0:
         status_body = {'privacyStatus': 'public'}
         print("Status: FORAN PUBLIC HOGI")
@@ -126,7 +141,7 @@ for idx, item in enumerate(to_upload):
             'privacyStatus': 'private',
             'publishAt': iso_schedule
         }
-        print(f"Status: Auto-Schedule hogi (UTC Time: {iso_schedule}) [Pehli se {idx*2} ghante baad]")
+        print(f"Status: Auto-Schedule hogi (Time: {iso_schedule}) [Pehli se {idx*2} ghante baad]")
 
     body = {
         'snippet': {

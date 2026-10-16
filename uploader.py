@@ -11,7 +11,6 @@ CLIENT_ID = "546480239670-" + "ogm0nio8rj9mmq3ra4hiprs85h1lpods" + ".apps.google
 CLIENT_SECRET = "GOCSPX-" + "fIbl82ugB74Mum7WvCMskf-oaowm"
 REDIRECT_URI = "http://localhost:8080/"
 
-# Authorization Code jo aapne share kiya:
 AUTH_CODE = "4/0AXlqoi5jIZWDYdRamp0Rqj-uJJ06GHN46HA65KDhlwGdHfRnwBwrkXPQ4KDaqjWWHAUBgw"
 TOKEN_CACHE_FILE = "google_token.json"
 
@@ -20,8 +19,6 @@ TIKTOK_USERNAME = "the.qayyum8"
 MAX_DAILY_UPLOADS = 5
 
 def get_credentials():
-    creds = None
-    # Agar pehle se token save hai to wahan se uthana
     if os.path.exists(TOKEN_CACHE_FILE):
         try:
             with open(TOKEN_CACHE_FILE, "r") as f:
@@ -38,7 +35,6 @@ def get_credentials():
         except Exception:
             pass
 
-    # Pehli martaba authorization code se tokens generate karna
     print("Exchanging authorization code for tokens...")
     resp = requests.post(
         "https://oauth2.googleapis.com/token",
@@ -72,7 +68,6 @@ def get_credentials():
 creds = get_credentials()
 youtube = build('youtube', 'v3', credentials=creds)
 
-# State Tracker Load
 if os.path.exists(TRACKER_FILE):
     try:
         with open(TRACKER_FILE, "r") as f:
@@ -84,22 +79,63 @@ else:
 
 print(f"Step 1: TikTok account @{TIKTOK_USERNAME} se taaza videos fetch ho rahi hain...")
 
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
-api_url = f"https://www.tikwm.com/api/user/posts?unique_id={TIKTOK_USERNAME}&count=20"
-resp = requests.get(api_url, headers=headers, timeout=25)
+session = requests.Session()
+session.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Referer": "https://www.tikwm.com/",
+    "Accept": "application/json, text/javascript, */*; q=0.01"
+})
 
-if resp.status_code != 200:
-    print(f"Feed error: {resp.status_code}")
+posts = []
+
+# Method 1: TikWM User API with proper headers
+try:
+    api_url = f"https://www.tikwm.com/api/user/posts?unique_id={TIKTOK_USERNAME}&count=25"
+    r = session.get(api_url, timeout=25)
+    if r.status_code == 200 and r.json().get("code") == 0:
+        posts = r.json().get("data", {}).get("videos", [])
+except Exception as e:
+    print(f"Endpoint 1 notice: {e}")
+
+# Method 2: Fallback TikWM User Web Query
+if not posts:
+    try:
+        print("Fallback endpoint se user videos dhoondi ja rahi hain...")
+        api_url2 = "https://www.tikwm.com/api/feed/user"
+        r2 = session.post(api_url2, data={"unique_id": TIKTOK_USERNAME, "count": 25}, timeout=25)
+        if r2.status_code == 200 and r2.json().get("code") == 0:
+            posts = r2.json().get("data", {}).get("videos", [])
+    except Exception as e:
+        print(f"Endpoint 2 notice: {e}")
+
+# Method 3: Direct User Profile Scraping
+if not posts:
+    try:
+        print("Direct TikTok public endpoint se videos parse ho rahi hain...")
+        t_url = f"https://www.tiktok.com/@{TIKTOK_USERNAME}"
+        t_resp = requests.get(t_url, headers={
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        }, timeout=25)
+        v_ids = re.findall(r'video\/(\d{15,22})', t_resp.text)
+        unique_vids = list(dict.fromkeys(v_ids))
+        for vid in unique_vids[:10]:
+            # Single video resolver via TikWM
+            res = session.post("https://www.tikwm.com/api/", data={"url": f"https://www.tiktok.com/@{TIKTOK_USERNAME}/video/{vid}"}, timeout=15)
+            if res.status_code == 200 and res.json().get("code") == 0:
+                v_data = res.json().get("data", {})
+                if v_data.get("play"):
+                    posts.append({
+                        "video_id": vid,
+                        "title": v_data.get("title", f"Shorts #{vid[-4:]}"),
+                        "play": v_data.get("play")
+                    })
+    except Exception as e:
+        print(f"Endpoint 3 notice: {e}")
+
+if not posts:
+    print("Videos abhi fetch nahi ho sakeen. Process exit.")
     exit(1)
 
-posts = resp.json().get("data", {}).get("videos", [])
-if not posts:
-    print("Account par koi video nahi mili.")
-    exit(0)
-
-# Sirf un-uploaded videos filter karna
 pending_videos = []
 for post in posts:
     vid_id = str(post.get("video_id"))
@@ -107,11 +143,11 @@ for post in posts:
         pending_videos.append(post)
 
 if not pending_videos:
-    print("Koi nayi video nahi mili. Sab pehle hi upload ho chuki hain.")
+    print("Koi nayi video nahi mili. Sab pehle se upload ho chuki hain.")
     exit(0)
 
 to_upload = pending_videos[:MAX_DAILY_UPLOADS]
-print(f"Total Nayi Videos: {len(pending_videos)}. Aaj upload hone ke liye chuni gayi: {len(to_upload)}")
+print(f"Nayi Videos Mili: {len(pending_videos)}. Aaj upload hone ke liye chuni gayi: {len(to_upload)}")
 
 now_utc = datetime.datetime.now(datetime.timezone.utc)
 
@@ -133,7 +169,7 @@ for idx, post in enumerate(to_upload):
         os.remove(local_file)
 
     print(f"\n[{idx+1}/{len(to_upload)}] Video Download ho rahi hai: {clean_title}...")
-    with requests.get(video_stream_url, stream=True, timeout=60) as dl:
+    with session.get(video_stream_url, stream=True, timeout=60) as dl:
         dl.raise_for_status()
         with open(local_file, "wb") as f:
             for chunk in dl.iter_content(chunk_size=1024 * 1024):
@@ -143,9 +179,8 @@ for idx, post in enumerate(to_upload):
     file_size_mb = os.path.getsize(local_file) / (1024 * 1024)
     print(f"Downloaded ({file_size_mb:.2f} MB). Setup scheduling...")
 
-    # Scheduling Logic:
     # idx == 0: Foran Public
-    # idx > 0: Har agli video pichli se 2 ghante baad schedule (private + publishAt)
+    # idx > 0: Har agli video pichli se 2 ghante baad schedule
     if idx == 0:
         status_body = {
             'privacyStatus': 'public'

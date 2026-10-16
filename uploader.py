@@ -11,7 +11,8 @@ CLIENT_ID = "546480239670-" + "ogm0nio8rj9mmq3ra4hiprs85h1lpods" + ".apps.google
 CLIENT_SECRET = "GOCSPX-" + "fIbl82ugB74Mum7WvCMskf-oaowm"
 REDIRECT_URI = "http://localhost:8080/"
 
-AUTH_CODE = "4/0AXlqoi5jIZWDYdRamp0Rqj-uJJ06GHN46HA65KDhlwGdHfRnwBwrkXPQ4KDaqjWWHAUBgw"
+# Aapka provide kiya hua fresh authorization code:
+AUTH_CODE = "4/0AXlqoi45X-tQmDMFzGZ_fhSbcbuVFGvjwBXkjrM8EiaeGPUNK9iXqSebreDSdsWWpSw2QQ"
 TOKEN_CACHE_FILE = "google_token.json"
 
 TRACKER_FILE = "uploaded_shorts.json"
@@ -35,7 +36,7 @@ def get_credentials():
         except Exception:
             pass
 
-    print("Exchanging authorization code for tokens...")
+    print("Step 0: Authorization code se permanent Refresh Token generate ho raha hai...")
     resp = requests.post(
         "https://oauth2.googleapis.com/token",
         data={
@@ -45,7 +46,7 @@ def get_credentials():
             "grant_type": "authorization_code",
             "redirect_uri": REDIRECT_URI
         },
-        timeout=20
+        timeout=25
     )
     data = resp.json()
     if "refresh_token" not in data and "access_token" not in data:
@@ -81,61 +82,34 @@ print(f"Step 1: TikTok account @{TIKTOK_USERNAME} se taaza videos fetch ho rahi 
 
 session = requests.Session()
 session.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Referer": "https://www.tikwm.com/",
-    "Accept": "application/json, text/javascript, */*; q=0.01"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 })
 
 posts = []
 
-# Method 1: TikWM User API with proper headers
+# TikWM multi-endpoint resolver
 try:
-    api_url = f"https://www.tikwm.com/api/user/posts?unique_id={TIKTOK_USERNAME}&count=25"
+    api_url = f"https://www.tikwm.com/api/user/posts?unique_id={TIKTOK_USERNAME}&count=30"
     r = session.get(api_url, timeout=25)
     if r.status_code == 200 and r.json().get("code") == 0:
         posts = r.json().get("data", {}).get("videos", [])
 except Exception as e:
     print(f"Endpoint 1 notice: {e}")
 
-# Method 2: Fallback TikWM User Web Query
 if not posts:
     try:
-        print("Fallback endpoint se user videos dhoondi ja rahi hain...")
         api_url2 = "https://www.tikwm.com/api/feed/user"
-        r2 = session.post(api_url2, data={"unique_id": TIKTOK_USERNAME, "count": 25}, timeout=25)
+        r2 = session.post(api_url2, data={"unique_id": TIKTOK_USERNAME, "count": 30}, timeout=25)
         if r2.status_code == 200 and r2.json().get("code") == 0:
             posts = r2.json().get("data", {}).get("videos", [])
     except Exception as e:
         print(f"Endpoint 2 notice: {e}")
 
-# Method 3: Direct User Profile Scraping
 if not posts:
-    try:
-        print("Direct TikTok public endpoint se videos parse ho rahi hain...")
-        t_url = f"https://www.tiktok.com/@{TIKTOK_USERNAME}"
-        t_resp = requests.get(t_url, headers={
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-        }, timeout=25)
-        v_ids = re.findall(r'video\/(\d{15,22})', t_resp.text)
-        unique_vids = list(dict.fromkeys(v_ids))
-        for vid in unique_vids[:10]:
-            # Single video resolver via TikWM
-            res = session.post("https://www.tikwm.com/api/", data={"url": f"https://www.tiktok.com/@{TIKTOK_USERNAME}/video/{vid}"}, timeout=15)
-            if res.status_code == 200 and res.json().get("code") == 0:
-                v_data = res.json().get("data", {})
-                if v_data.get("play"):
-                    posts.append({
-                        "video_id": vid,
-                        "title": v_data.get("title", f"Shorts #{vid[-4:]}"),
-                        "play": v_data.get("play")
-                    })
-    except Exception as e:
-        print(f"Endpoint 3 notice: {e}")
-
-if not posts:
-    print("Videos abhi fetch nahi ho sakeen. Process exit.")
+    print("TikTok videos abhi fetch nahi ho sakeen. Exiting.")
     exit(1)
 
+# Pehle se upload shuda videos ko skip karna
 pending_videos = []
 for post in posts:
     vid_id = str(post.get("video_id"))
@@ -143,18 +117,18 @@ for post in posts:
         pending_videos.append(post)
 
 if not pending_videos:
-    print("Koi nayi video nahi mili. Sab pehle se upload ho chuki hain.")
+    print("Koi nayi video nahi mili. Sab pehle hi upload ho chuki hain.")
     exit(0)
 
 to_upload = pending_videos[:MAX_DAILY_UPLOADS]
-print(f"Nayi Videos Mili: {len(pending_videos)}. Aaj upload hone ke liye chuni gayi: {len(to_upload)}")
+print(f"Nayi Videos Mili: {len(pending_videos)}. Aaj process hone wali videos: {len(to_upload)}")
 
 now_utc = datetime.datetime.now(datetime.timezone.utc)
 
 for idx, post in enumerate(to_upload):
     video_id = str(post.get("video_id"))
     raw_title = post.get("title", "").strip() or f"Shorts #{video_id[-4:]}"
-    
+
     clean_title = re.sub(r'[\r\n]+', ' ', raw_title)
     if "#shorts" not in clean_title.lower():
         clean_title = f"{clean_title[:85]} #Shorts"
@@ -179,13 +153,11 @@ for idx, post in enumerate(to_upload):
     file_size_mb = os.path.getsize(local_file) / (1024 * 1024)
     print(f"Downloaded ({file_size_mb:.2f} MB). Setup scheduling...")
 
-    # idx == 0: Foran Public
-    # idx > 0: Har agli video pichli se 2 ghante baad schedule
+    # idx == 0: Pehli video Foran Public
+    # idx > 0: Baqi 4 videos 2-2 ghante ke gap se Private (Scheduled)
     if idx == 0:
-        status_body = {
-            'privacyStatus': 'public'
-        }
-        print("Status: FORAN PUBLIC HOGI")
+        status_body = {'privacyStatus': 'public'}
+        print("Status: FORAN PUBLIC HO GYI")
     else:
         scheduled_time = now_utc + datetime.timedelta(hours=(idx * 2))
         iso_schedule = scheduled_time.strftime("%Y-%m-%dT%H:%M:%S.000Z")
@@ -193,7 +165,7 @@ for idx, post in enumerate(to_upload):
             'privacyStatus': 'private',
             'publishAt': iso_schedule
         }
-        print(f"Status: Auto-Schedule hogi (UTC Time: {iso_schedule}) [Pehli se {idx*2} ghante baad]")
+        print(f"Status: Auto-Schedule hogi ({iso_schedule}) [Pehli se {idx*2} ghante baad]")
 
     body = {
         'snippet': {
@@ -222,4 +194,4 @@ for idx, post in enumerate(to_upload):
     if os.path.exists(local_file):
         os.remove(local_file)
 
-print("\nAaj ki 5 Shorts kamyabi se process ho chuki hain!")
+print("\nAaj ki 5 Shorts kamyabi se upload/schedule ho chuki hain!")

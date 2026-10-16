@@ -26,10 +26,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: Install Python Dependencies
+      - name: Install Python Dependencies & Browser Impersonator
         run: |
           pip install --upgrade pip
-          pip install google-api-python-client google-auth-oauthlib requests "yt-dlp[default]"
+          pip install google-api-python-client google-auth-oauthlib requests "yt-dlp[default,curl-cffi]"
 
       - name: Run TikTok Shorts Uploader
         run: |

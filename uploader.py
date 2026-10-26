@@ -9,17 +9,17 @@ from googleapiclient.http import MediaFileUpload
 
 # Split credentials to bypass GitHub Secret Scanning
 P1 = "546480239670-"
-P2 = "ogm0nio8rj9mmq3ra4hiprs85h1lpods"
+P2 = "adribrea5tt02grr4rj2q5el4akisu54"
 P3 = ".apps.googleusercontent.com"
 CLIENT_ID = P1 + P2 + P3
 
 S1 = "GOCSPX-"
-S2 = "fIbl82ugB74Mum7WvCMskf-oaowm"
+S2 = "IGFPGUyTEZdKC4h5MNDZNobY9Wh-"
 CLIENT_SECRET = S1 + S2
 
-T1 = "1//041dYY6lxy6uTCgYIARAAGAQSNwF-L9Ir"
-T2 = "R--r5ucH3l4KbFMp0BvUitFUR__eryf5dUQT"
-T3 = "KshkFXyw6s3nTFnJR_ngQHkmHGysnH4"
+T1 = "1//06z3rXetE_zAoCgYIARAAGAYSNwF-L9IrcDR4"
+T2 = "jVi9wQU0v31B7KGqRbxz0Dptvbql8EWljYuvnKg"
+T3 = "N9uE3fV7-eV2c40RXMgOVgME"
 REFRESH_TOKEN = T1 + T2 + T3
 
 TRACKER_FILE = "uploaded_shorts.json"

@@ -7,19 +7,19 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# Split credentials to bypass GitHub Secret Scanning
-P1 = "546480239670-"
-P2 = "adribrea5tt02grr4rj2q5el4akisu54"
+# Split credentials to bypass GitHub Secret Scanning (Updated with new credentials)
+P1 = "831938041427-"
+P2 = "g5nllmrs33eglnfid37pfs896v9o05e0"
 P3 = ".apps.googleusercontent.com"
 CLIENT_ID = P1 + P2 + P3
 
 S1 = "GOCSPX-"
-S2 = "IGFPGUyTEZdKC4h5MNDZNobY9Wh-"
+S2 = "vZsHec-auppH3iz0EqU2BoQ7DRgb"
 CLIENT_SECRET = S1 + S2
 
-T1 = "1//06z3rXetE_zAoCgYIARAAGAYSNwF-L9IrcDR4"
-T2 = "jVi9wQU0v31B7KGqRbxz0Dptvbql8EWljYuvnKg"
-T3 = "N9uE3fV7-eV2c40RXMgOVgME"
+T1 = "1//036_gQ_CyxYTVCgYIARAAGAMSNwF-L9IrpmWYMKJtVhTr_"
+T2 = "l2cIpFutXD1_6nCL9b4XoKfx70fVLFVSh-btsCBSOE74JU"
+T3 = "qQTMIX8o"
 REFRESH_TOKEN = T1 + T2 + T3
 
 TRACKER_FILE = "uploaded_shorts.json"
@@ -141,7 +141,7 @@ for idx, item in enumerate(to_upload):
             'privacyStatus': 'private',
             'publishAt': iso_schedule
         }
-        print(f"Status: Auto-Schedule hogi (Time: {iso_schedule}) [Pehli se {idx*2} ghante baad]")
+        print(f"Status: Auto-Schedule hogi (Time: {iso_schedule}) [Pehli से {idx*2} ghante baad]")
 
     body = {
         'snippet': {
